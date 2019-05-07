@@ -34,6 +34,7 @@
             android:name=".HardStreamingActivity"
             android:hardwareAccelerated="true"
             android:theme="@style/StreamingTheme" />
+        <activity android:name="net.yrom.screenrecorder.RecMainActivity"/>
     </application>
 
 </manifest>
