@@ -33,15 +33,18 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import me.lake.librestreaming.core.VideoSenderThread;
+import me.lake.librestreaming.rtmp.RESFlvDataCollecter;
+
 import static android.media.MediaFormat.MIMETYPE_AUDIO_AAC;
 import static android.media.MediaFormat.MIMETYPE_VIDEO_AVC;
 
 /**
  * @author Yrom
  */
-public class ScreenRecorder {
+public class ScreenRecorderPlus {
     private static final String TAG = "ScreenRecorder";
-    private static final boolean VERBOSE = false;
+    private static final boolean VERBOSE = true;
     private static final int INVALID_INDEX = -1;
     static final String VIDEO_AVC = MIMETYPE_VIDEO_AVC; // H.264 Advanced Video Coding
     static final String AUDIO_AAC = MIMETYPE_AUDIO_AAC; // H.264 Advanced Audio Coding
@@ -52,6 +55,7 @@ public class ScreenRecorder {
     private MediaProjection mMediaProjection;
     private VideoEncoder mVideoEncoder;
     private MicRecorder mAudioEncoder;
+    private RESFlvDataCollecter mDataCollecter;
 
     private MediaFormat mVideoOutputFormat = null, mAudioOutputFormat = null;
     private int mVideoTrackIndex = INVALID_INDEX, mAudioTrackIndex = INVALID_INDEX;
@@ -77,13 +81,14 @@ public class ScreenRecorder {
     private LinkedList<MediaCodec.BufferInfo> mPendingAudioEncoderBufferInfos = new LinkedList<>();
     private LinkedList<MediaCodec.BufferInfo> mPendingVideoEncoderBufferInfos = new LinkedList<>();
 
+    private VideoSenderThread videoSenderThread;
     /**
      * @param dpi for {@link VirtualDisplay}
      */
-    public ScreenRecorder(VideoEncodeConfig video,
-                          AudioEncodeConfig audio,
-                          int dpi, MediaProjection mp,
-                          String dstPath) {
+    public ScreenRecorderPlus(VideoEncodeConfig video,
+                              AudioEncodeConfig audio,
+                              int dpi, MediaProjection mp,
+                              String dstPath, RESFlvDataCollecter dataCollecter) {
         mWidth = video.width;
         mHeight = video.height;
         mDpi = dpi;
@@ -91,7 +96,7 @@ public class ScreenRecorder {
         mDstPath = dstPath;
         mVideoEncoder = new VideoEncoder(video);
         mAudioEncoder = audio == null ? null : new MicRecorder(audio);
-
+        mDataCollecter = dataCollecter;
     }
 
     /**
@@ -368,7 +373,9 @@ public class ScreenRecorder {
             public void onOutputBufferAvailable(BaseEncoder codec, int index, MediaCodec.BufferInfo info) {
                 if (VERBOSE) Log.i(TAG, "VideoEncoder output buffer available: index=" + index);
                 try {
-                    muxVideo(index, info);
+                    // TODO: 2019/5/8
+                    //muxVideo(index, info);
+
                 } catch (Exception e) {
                     Log.e(TAG, "Muxer encountered an error! ", e);
                     Message.obtain(mHandler, MSG_ERROR, e).sendToTarget();
@@ -385,11 +392,13 @@ public class ScreenRecorder {
             @Override
             public void onOutputFormatChanged(BaseEncoder codec, MediaFormat format) {
                 resetVideoOutputFormat(format);
-                startMuxerIfReady();
+                //startMuxerIfReady();
             }
         };
         mVideoEncoder.setCallback(callback);
         mVideoEncoder.prepare();
+        videoSenderThread = new VideoSenderThread("VideoSenderThread", mVideoEncoder.getEncoder(), mDataCollecter);
+        videoSenderThread.start();
     }
 
     private void prepareAudioEncoder() throws IOException {
@@ -403,7 +412,8 @@ public class ScreenRecorder {
                 if (VERBOSE)
                     Log.i(TAG, "[" + Thread.currentThread().getId() + "] AudioEncoder output buffer available: index=" + index);
                 try {
-                    muxAudio(index, info);
+                    // TODO: 2019/5/8
+                    //muxAudio(index, info);
                 } catch (Exception e) {
                     Log.e(TAG, "Muxer encountered an error! ", e);
                     Message.obtain(mHandler, MSG_ERROR, e).sendToTarget();
@@ -415,7 +425,7 @@ public class ScreenRecorder {
                 if (VERBOSE)
                     Log.d(TAG, "[" + Thread.currentThread().getId() + "] AudioEncoder returned new format " + format);
                 resetAudioOutputFormat(format);
-                startMuxerIfReady();
+                //startMuxerIfReady();
             }
 
             @Override
@@ -486,15 +496,15 @@ public class ScreenRecorder {
             mMediaProjection.stop();
             mMediaProjection = null;
         }
-        if (mMuxer != null) {
-            try {
-                mMuxer.stop();
-                mMuxer.release();
-            } catch (Exception e) {
-                // ignored
-            }
-            mMuxer = null;
-        }
+//        if (mMuxer != null) {
+//            try {
+//                mMuxer.stop();
+//                mMuxer.release();
+//            } catch (Exception e) {
+//                // ignored
+//            }
+//            mMuxer = null;
+//        }
         mHandler = null;
     }
 

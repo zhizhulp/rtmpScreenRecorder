@@ -28,9 +28,9 @@ import android.os.Build;
 import android.os.SystemClock;
 import android.text.format.DateUtils;
 
-import me.lake.librestreaming.sample.R;
 
-import static android.os.Build.VERSION_CODES.O;
+import me.lake.librestreaming.R;
+
 import static net.yrom.screenrecorder.RecMainActivity.ACTION_STOP;
 
 /**

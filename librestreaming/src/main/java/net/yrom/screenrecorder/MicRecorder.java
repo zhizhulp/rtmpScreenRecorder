@@ -125,35 +125,26 @@ class MicRecorder implements Encoder {
         }
 
 
-        void onError(final Encoder encoder, final Exception exception) {
-            Message.obtain(this, new Runnable() {
-                @Override
-                public void run() {
-                    if (mCallback != null) {
-                        mCallback.onError(encoder, exception);
-                    }
+        void onError(Encoder encoder, Exception exception) {
+            Message.obtain(this, () -> {
+                if (mCallback != null) {
+                    mCallback.onError(encoder, exception);
                 }
             }).sendToTarget();
         }
 
-        void onOutputFormatChanged(final BaseEncoder encoder, final MediaFormat format) {
-            Message.obtain(this, new Runnable() {
-                @Override
-                public void run() {
-                    if (mCallback != null) {
-                        mCallback.onOutputFormatChanged(encoder, format);
-                    }
+        void onOutputFormatChanged(BaseEncoder encoder, MediaFormat format) {
+            Message.obtain(this, () -> {
+                if (mCallback != null) {
+                    mCallback.onOutputFormatChanged(encoder, format);
                 }
             }).sendToTarget();
         }
 
-        void onOutputBufferAvailable(final BaseEncoder encoder, final int index, final MediaCodec.BufferInfo info) {
-            Message.obtain(this, new Runnable() {
-                @Override
-                public void run() {
-                    if (mCallback != null) {
-                        mCallback.onOutputBufferAvailable(encoder, index, info);
-                    }
+        void onOutputBufferAvailable(BaseEncoder encoder, int index, MediaCodec.BufferInfo info) {
+            Message.obtain(this, () -> {
+                if (mCallback != null) {
+                    mCallback.onOutputBufferAvailable(encoder, index, info);
                 }
             }).sendToTarget();
         }

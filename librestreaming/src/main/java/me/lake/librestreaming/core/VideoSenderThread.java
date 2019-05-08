@@ -21,7 +21,7 @@ public class VideoSenderThread extends Thread {
     private final Object syncDstVideoEncoder = new Object();
     private RESFlvDataCollecter dataCollecter;
 
-    VideoSenderThread(String name, MediaCodec encoder, RESFlvDataCollecter flvDataCollecter) {
+    public VideoSenderThread(String name, MediaCodec encoder, RESFlvDataCollecter flvDataCollecter) {
         super(name);
         eInfo = new MediaCodec.BufferInfo();
         startTime = 0;

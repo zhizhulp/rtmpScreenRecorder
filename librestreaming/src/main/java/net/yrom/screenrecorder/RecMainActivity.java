@@ -56,7 +56,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import me.lake.librestreaming.sample.R;
+import me.lake.librestreaming.R;
 
 import static android.Manifest.permission.RECORD_AUDIO;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
