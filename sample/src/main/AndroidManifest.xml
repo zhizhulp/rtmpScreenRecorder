@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="me.lake.librestreaming.sample">
 
     <uses-permission android:name="android.permission.CAMERA" />
@@ -17,14 +18,12 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        tools:ignore="AllowBackup,GoogleAppIndexingWarning">
         <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+
         </activity>
         <activity
             android:name=".SoftStreamingActivity"
@@ -34,7 +33,12 @@
             android:name=".HardStreamingActivity"
             android:hardwareAccelerated="true"
             android:theme="@style/StreamingTheme" />
-        <activity android:name="net.yrom.screenrecorder.RecMainActivity"/>
+        <activity android:name="net.yrom.screenrecorder.RecMainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>
