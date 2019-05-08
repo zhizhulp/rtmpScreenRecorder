@@ -28,8 +28,8 @@ import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 
+import me.lake.librestreaming.R;
 
-import me.lake.librestreaming.sample.R;
 
 /**
  * @author yrom
