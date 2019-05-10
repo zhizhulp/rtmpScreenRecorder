@@ -206,7 +206,7 @@ public class ScreenRecorderPlus {
             mMuxer = new MediaMuxer(mDstPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             // create encoder and input surface
             prepareVideoEncoder();
-//            prepareAudioEncoder();
+            prepareAudioEncoder();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -385,7 +385,7 @@ public class ScreenRecorderPlus {
                  * so we ignore MediaCodec.BUFFER_FLAG_CODEC_CONFIG
                  */
                 if (eInfo.flags != MediaCodec.BUFFER_FLAG_CODEC_CONFIG && eInfo.size != 0) {
-                    ByteBuffer realData = codec.getEncoder().getOutputBuffers()[eobIndex];
+                    ByteBuffer realData = codec.getEncoder().getOutputBuffer(eobIndex);//getOutputBuffers()[eobIndex] 会报错
                     realData.position(eInfo.offset + 4);
                     realData.limit(eInfo.offset + eInfo.size);
                     sendVideoRealData((eInfo.presentationTimeUs / 1000) - videoStartTime, realData);
@@ -406,10 +406,10 @@ public class ScreenRecorderPlus {
                 sendAVCDecoderConfigurationRecord(0, format);
             }
         };
-        //mVideoEncoder.setCallback(callback);
+        mVideoEncoder.setCallback(callback);
         mVideoEncoder.prepare();
-        videoSenderThread = new VideoSenderThread("VideoSenderThread", mVideoEncoder.getEncoder(), mDataCollecter);
-        videoSenderThread.start();
+//        videoSenderThread = new VideoSenderThread("VideoSenderThread", mVideoEncoder.getEncoder(), mDataCollecter);
+//        videoSenderThread.start();
     }
 
     private long startTime;
@@ -432,7 +432,7 @@ public class ScreenRecorderPlus {
                  * so we ignore MediaCodec.BUFFER_FLAG_CODEC_CONFIG
                  */
                 if (eInfo.flags != MediaCodec.BUFFER_FLAG_CODEC_CONFIG && eInfo.size != 0) {
-                    ByteBuffer realData = codec.getEncoder().getOutputBuffers()[eobIndex];
+                    ByteBuffer realData = codec.getEncoder().getOutputBuffer(eobIndex);
                     realData.position(eInfo.offset);
                     realData.limit(eInfo.offset + eInfo.size);
                     sendRealData((eInfo.presentationTimeUs / 1000) - startTime, realData);
