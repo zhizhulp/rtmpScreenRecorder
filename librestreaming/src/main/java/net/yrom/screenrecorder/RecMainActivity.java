@@ -57,6 +57,10 @@ import java.util.List;
 import java.util.Locale;
 
 import me.lake.librestreaming.R;
+import me.lake.librestreaming.model.RESCoreParameters;
+import me.lake.librestreaming.rtmp.RESFlvData;
+import me.lake.librestreaming.rtmp.RESFlvDataCollecter;
+import me.lake.librestreaming.rtmp.RESRtmpSender;
 
 import static android.Manifest.permission.RECORD_AUDIO;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
@@ -92,7 +96,7 @@ public class RecMainActivity extends Activity {
      * {@code ScreenRecorder} should run in background Service
      * instead of a foreground Activity in this demonstrate.
      */
-    private ScreenRecorder mRecorder;
+    private ScreenRecorderPlus mRecorder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -142,6 +146,11 @@ public class RecMainActivity extends Activity {
         findViewById(R.id.container).setPadding(horizontal, vertical, horizontal, vertical);
     }
 
+    private RESRtmpSender rtmpSender;
+    private RESFlvDataCollecter dataCollecter;
+    private RESCoreParameters coreParameters;
+    private String rtmpIp = "rtmp://192.168.1.194:1935/hls/stream";
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_MEDIA_PROJECTION) {
@@ -171,7 +180,20 @@ public class RecMainActivity extends Activity {
             final File file = new File(dir, "Screen-" + format.format(new Date())
                     + "-" + video.width + "x" + video.height + ".mp4");
             Log.d("@@", "Create recorder with :" + video + " \n " + audio + "\n " + file);
-            mRecorder = newRecorder(mediaProjection, video, audio, file);
+            coreParameters = new RESCoreParameters();
+            coreParameters.rtmpAddr = rtmpIp;
+            coreParameters.printDetailMsg = true;
+            coreParameters.senderQueueLength = 150;
+            rtmpSender = new RESRtmpSender();
+            rtmpSender.prepare(coreParameters);
+            dataCollecter = new RESFlvDataCollecter() {
+                @Override
+                public void collect(RESFlvData flvData, int type) {
+                    rtmpSender.feed(flvData, type);
+                }
+            };
+            mRecorder = newRecorder(dataCollecter, mediaProjection, video, audio, file);
+
             if (hasPermissions()) {
                 startRecorder();
             } else {
@@ -180,11 +202,11 @@ public class RecMainActivity extends Activity {
         }
     }
 
-    private ScreenRecorder newRecorder(MediaProjection mediaProjection, VideoEncodeConfig video,
-                                       AudioEncodeConfig audio, final File output) {
-        ScreenRecorder r = new ScreenRecorder(video, audio,
-                1, mediaProjection, output.getAbsolutePath());
-        r.setCallback(new ScreenRecorder.Callback() {
+    private ScreenRecorderPlus newRecorder(RESFlvDataCollecter dataCollecter, MediaProjection mediaProjection, VideoEncodeConfig video,
+                                           AudioEncodeConfig audio, final File output) {
+        ScreenRecorderPlus r = new ScreenRecorderPlus(video, audio,
+                1, mediaProjection, output.getAbsolutePath(), dataCollecter);
+        r.setCallback(new ScreenRecorderPlus.Callback() {
             long startTime = 0;
 
             @Override
@@ -352,6 +374,8 @@ public class RecMainActivity extends Activity {
     private void startRecorder() {
         if (mRecorder == null) return;
         mRecorder.start();
+        rtmpSender.start(coreParameters.rtmpAddr);
+
         mButton.setText("Stop Recorder");
         registerReceiver(mStopActionReceiver, new IntentFilter(ACTION_STOP));
         moveTaskToBack(true);
@@ -362,6 +386,7 @@ public class RecMainActivity extends Activity {
         if (mRecorder != null) {
             mRecorder.quit();
         }
+        rtmpSender.stop();
         mRecorder = null;
         mButton.setText("Restart recorder");
         try {

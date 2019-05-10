@@ -150,6 +150,7 @@ public class RESRtmpSender {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case MSG_START:
+                    LogTools.d("RESRtmpSender start"+state);
                     if (state == STATE.RUNNING) {
                         break;
                     }
@@ -171,6 +172,7 @@ public class RESRtmpSender {
                         }
                     }
                     if (jniRtmpPointer == 0) {
+                        LogTools.d("RESRtmpSender start failed"+state);
                         break;
                     } else {
                         byte[] MetaData = fLvMetaData.getMetaData();
@@ -182,6 +184,7 @@ public class RESRtmpSender {
                     }
                     break;
                 case MSG_STOP:
+                    LogTools.d("RESRtmpSender stop"+state);
                     if (state == STATE.STOPPED || jniRtmpPointer == 0) {
                         break;
                     }
@@ -201,6 +204,7 @@ public class RESRtmpSender {
                     state = STATE.STOPPED;
                     break;
                 case MSG_WRITE:
+                    LogTools.d("RESRtmpSender write"+state);
                     synchronized (syncWriteMsgNum) {
                         --writeMsgNum;
                     }

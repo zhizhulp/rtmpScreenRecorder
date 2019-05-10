@@ -18,6 +18,8 @@ package net.yrom.screenrecorder;
 
 import java.io.IOException;
 
+import me.lake.librestreaming.rtmp.RESFlvDataCollecter;
+
 /**
  * @author yrom
  * @version 2017/12/4

@@ -5,6 +5,8 @@ import android.annotation.TargetApi;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 
+import net.yrom.screenrecorder.ScreenRecorderPlus;
+
 import me.lake.librestreaming.core.listener.RESConnectionListener;
 import me.lake.librestreaming.core.listener.RESScreenShotListener;
 import me.lake.librestreaming.core.listener.RESVideoChangeListener;
@@ -30,6 +32,7 @@ public class RESClient {
     RESCoreParameters coreParameters;
     private RESRtmpSender rtmpSender;
     private RESFlvDataCollecter dataCollecter;
+    private ScreenRecorderPlus screenRecorder;
 
     public RESClient() {
         SyncOp = new Object();
@@ -62,14 +65,15 @@ public class RESClient {
                 LogTools.d(coreParameters.toString());
                 return false;
             }
-            rtmpSender = new RESRtmpSender();
-            rtmpSender.prepare(coreParameters);
             dataCollecter = new RESFlvDataCollecter() {
                 @Override
                 public void collect(RESFlvData flvData, int type) {
                     rtmpSender.feed(flvData, type);
                 }
             };
+            rtmpSender = new RESRtmpSender();
+            rtmpSender.prepare(coreParameters);
+
             coreParameters.done = true;
             LogTools.d("===INFO===coreParametersReady:");
             LogTools.d(coreParameters.toString());

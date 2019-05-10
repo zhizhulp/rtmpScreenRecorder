@@ -33,8 +33,11 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import me.lake.librestreaming.core.Packager;
 import me.lake.librestreaming.core.VideoSenderThread;
+import me.lake.librestreaming.rtmp.RESFlvData;
 import me.lake.librestreaming.rtmp.RESFlvDataCollecter;
+import me.lake.librestreaming.rtmp.RESRtmpSender;
 
 import static android.media.MediaFormat.MIMETYPE_AUDIO_AAC;
 import static android.media.MediaFormat.MIMETYPE_VIDEO_AVC;
@@ -82,6 +85,7 @@ public class ScreenRecorderPlus {
     private LinkedList<MediaCodec.BufferInfo> mPendingVideoEncoderBufferInfos = new LinkedList<>();
 
     private VideoSenderThread videoSenderThread;
+
     /**
      * @param dpi for {@link VirtualDisplay}
      */
@@ -202,7 +206,7 @@ public class ScreenRecorderPlus {
             mMuxer = new MediaMuxer(mDstPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             // create encoder and input surface
             prepareVideoEncoder();
-            prepareAudioEncoder();
+//            prepareAudioEncoder();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -364,42 +368,51 @@ public class ScreenRecorderPlus {
         if (VERBOSE) Log.i(TAG, "Mux pending video output buffers done.");
     }
 
+    private long videoStartTime;
+
     // @WorkerThread
     private void prepareVideoEncoder() throws IOException {
         VideoEncoder.Callback callback = new VideoEncoder.Callback() {
-            boolean ranIntoError = false;
 
             @Override
-            public void onOutputBufferAvailable(BaseEncoder codec, int index, MediaCodec.BufferInfo info) {
-                if (VERBOSE) Log.i(TAG, "VideoEncoder output buffer available: index=" + index);
-                try {
-                    // TODO: 2019/5/8
-                    //muxVideo(index, info);
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Muxer encountered an error! ", e);
-                    Message.obtain(mHandler, MSG_ERROR, e).sendToTarget();
+            public void onOutputBufferAvailable(BaseEncoder codec, int eobIndex, MediaCodec.BufferInfo eInfo) {
+                if (VERBOSE) Log.i(TAG, "VideoEncoder output buffer available: index=" + eobIndex);
+                if (videoStartTime == 0) {
+                    videoStartTime = eInfo.presentationTimeUs / 1000;
                 }
+                /**
+                 * we send sps pps already in INFO_OUTPUT_FORMAT_CHANGED
+                 * so we ignore MediaCodec.BUFFER_FLAG_CODEC_CONFIG
+                 */
+                if (eInfo.flags != MediaCodec.BUFFER_FLAG_CODEC_CONFIG && eInfo.size != 0) {
+                    ByteBuffer realData = codec.getEncoder().getOutputBuffers()[eobIndex];
+                    realData.position(eInfo.offset + 4);
+                    realData.limit(eInfo.offset + eInfo.size);
+                    sendVideoRealData((eInfo.presentationTimeUs / 1000) - videoStartTime, realData);
+                }
+                mVideoEncoder.releaseOutputBuffer(eobIndex);
             }
 
             @Override
             public void onError(Encoder codec, Exception e) {
-                ranIntoError = true;
                 Log.e(TAG, "VideoEncoder ran into an error! ", e);
                 Message.obtain(mHandler, MSG_ERROR, e).sendToTarget();
             }
 
             @Override
             public void onOutputFormatChanged(BaseEncoder codec, MediaFormat format) {
-                resetVideoOutputFormat(format);
-                //startMuxerIfReady();
+                if (VERBOSE)
+                    Log.d(TAG, "[" + Thread.currentThread().getId() + "] VideoEncoder returned new format " + format);
+                sendAVCDecoderConfigurationRecord(0, format);
             }
         };
-        mVideoEncoder.setCallback(callback);
+        //mVideoEncoder.setCallback(callback);
         mVideoEncoder.prepare();
         videoSenderThread = new VideoSenderThread("VideoSenderThread", mVideoEncoder.getEncoder(), mDataCollecter);
         videoSenderThread.start();
     }
+
+    private long startTime;
 
     private void prepareAudioEncoder() throws IOException {
         final MicRecorder micRecorder = mAudioEncoder;
@@ -408,24 +421,31 @@ public class ScreenRecorderPlus {
             boolean ranIntoError = false;
 
             @Override
-            public void onOutputBufferAvailable(BaseEncoder codec, int index, MediaCodec.BufferInfo info) {
+            public void onOutputBufferAvailable(BaseEncoder codec, int eobIndex, MediaCodec.BufferInfo eInfo) {
                 if (VERBOSE)
-                    Log.i(TAG, "[" + Thread.currentThread().getId() + "] AudioEncoder output buffer available: index=" + index);
-                try {
-                    // TODO: 2019/5/8
-                    //muxAudio(index, info);
-                } catch (Exception e) {
-                    Log.e(TAG, "Muxer encountered an error! ", e);
-                    Message.obtain(mHandler, MSG_ERROR, e).sendToTarget();
+                    Log.i(TAG, "[" + Thread.currentThread().getId() + "] AudioEncoder output buffer available: index=" + eobIndex);
+                if (startTime == 0) {
+                    startTime = eInfo.presentationTimeUs / 1000;
                 }
+                /**
+                 * we send audio SpecificConfig already in INFO_OUTPUT_FORMAT_CHANGED
+                 * so we ignore MediaCodec.BUFFER_FLAG_CODEC_CONFIG
+                 */
+                if (eInfo.flags != MediaCodec.BUFFER_FLAG_CODEC_CONFIG && eInfo.size != 0) {
+                    ByteBuffer realData = codec.getEncoder().getOutputBuffers()[eobIndex];
+                    realData.position(eInfo.offset);
+                    realData.limit(eInfo.offset + eInfo.size);
+                    sendRealData((eInfo.presentationTimeUs / 1000) - startTime, realData);
+                }
+                micRecorder.releaseOutputBuffer(eobIndex);
             }
 
             @Override
             public void onOutputFormatChanged(BaseEncoder codec, MediaFormat format) {
                 if (VERBOSE)
                     Log.d(TAG, "[" + Thread.currentThread().getId() + "] AudioEncoder returned new format " + format);
-                resetAudioOutputFormat(format);
-                //startMuxerIfReady();
+                ByteBuffer csd0 = codec.getEncoder().getOutputFormat().getByteBuffer("csd-0");
+                sendAudioSpecificConfig(0, csd0);
             }
 
             @Override
@@ -496,15 +516,15 @@ public class ScreenRecorderPlus {
             mMediaProjection.stop();
             mMediaProjection = null;
         }
-//        if (mMuxer != null) {
-//            try {
-//                mMuxer.stop();
-//                mMuxer.release();
-//            } catch (Exception e) {
-//                // ignored
-//            }
-//            mMuxer = null;
-//        }
+        if (mMuxer != null) {
+            try {
+                mMuxer.stop();
+                mMuxer.release();
+            } catch (Exception e) {
+                // ignored
+            }
+            mMuxer = null;
+        }
         mHandler = null;
     }
 
@@ -514,6 +534,90 @@ public class ScreenRecorderPlus {
             Log.e(TAG, "release() not called!");
             release();
         }
+    }
+
+    private void sendAudioSpecificConfig(long tms, ByteBuffer realData) {
+        int packetLen = Packager.FLVPackager.FLV_AUDIO_TAG_LENGTH +
+                realData.remaining();
+        byte[] finalBuff = new byte[packetLen];
+        realData.get(finalBuff, Packager.FLVPackager.FLV_AUDIO_TAG_LENGTH,
+                realData.remaining());
+        Packager.FLVPackager.fillFlvAudioTag(finalBuff,
+                0,
+                true);
+        RESFlvData resFlvData = new RESFlvData();
+        resFlvData.droppable = false;
+        resFlvData.byteBuffer = finalBuff;
+        resFlvData.size = finalBuff.length;
+        resFlvData.dts = (int) tms;
+        resFlvData.flvTagType = RESFlvData.FLV_RTMP_PACKET_TYPE_AUDIO;
+        mDataCollecter.collect(resFlvData, RESRtmpSender.FROM_AUDIO);
+    }
+
+    private void sendRealData(long tms, ByteBuffer realData) {
+        int packetLen = Packager.FLVPackager.FLV_AUDIO_TAG_LENGTH +
+                realData.remaining();
+        byte[] finalBuff = new byte[packetLen];
+        realData.get(finalBuff, Packager.FLVPackager.FLV_AUDIO_TAG_LENGTH,
+                realData.remaining());
+        Packager.FLVPackager.fillFlvAudioTag(finalBuff,
+                0,
+                false);
+        RESFlvData resFlvData = new RESFlvData();
+        resFlvData.droppable = true;
+        resFlvData.byteBuffer = finalBuff;
+        resFlvData.size = finalBuff.length;
+        resFlvData.dts = (int) tms;
+        resFlvData.flvTagType = RESFlvData.FLV_RTMP_PACKET_TYPE_AUDIO;
+        mDataCollecter.collect(resFlvData, RESRtmpSender.FROM_AUDIO);
+    }
+
+    private void sendAVCDecoderConfigurationRecord(long tms, MediaFormat format) {
+        byte[] AVCDecoderConfigurationRecord = Packager.H264Packager.generateAVCDecoderConfigurationRecord(format);
+        int packetLen = Packager.FLVPackager.FLV_VIDEO_TAG_LENGTH +
+                AVCDecoderConfigurationRecord.length;
+        byte[] finalBuff = new byte[packetLen];
+        Packager.FLVPackager.fillFlvVideoTag(finalBuff,
+                0,
+                true,
+                true,
+                AVCDecoderConfigurationRecord.length);
+        System.arraycopy(AVCDecoderConfigurationRecord, 0,
+                finalBuff, Packager.FLVPackager.FLV_VIDEO_TAG_LENGTH, AVCDecoderConfigurationRecord.length);
+        RESFlvData resFlvData = new RESFlvData();
+        resFlvData.droppable = false;
+        resFlvData.byteBuffer = finalBuff;
+        resFlvData.size = finalBuff.length;
+        resFlvData.dts = (int) tms;
+        resFlvData.flvTagType = RESFlvData.FLV_RTMP_PACKET_TYPE_VIDEO;
+        resFlvData.videoFrameType = RESFlvData.NALU_TYPE_IDR;
+        mDataCollecter.collect(resFlvData, RESRtmpSender.FROM_VIDEO);
+    }
+
+    private void sendVideoRealData(long tms, ByteBuffer realData) {
+        int realDataLength = realData.remaining();
+        int packetLen = Packager.FLVPackager.FLV_VIDEO_TAG_LENGTH +
+                Packager.FLVPackager.NALU_HEADER_LENGTH +
+                realDataLength;
+        byte[] finalBuff = new byte[packetLen];
+        realData.get(finalBuff, Packager.FLVPackager.FLV_VIDEO_TAG_LENGTH +
+                        Packager.FLVPackager.NALU_HEADER_LENGTH,
+                realDataLength);
+        int frameType = finalBuff[Packager.FLVPackager.FLV_VIDEO_TAG_LENGTH +
+                Packager.FLVPackager.NALU_HEADER_LENGTH] & 0x1F;
+        Packager.FLVPackager.fillFlvVideoTag(finalBuff,
+                0,
+                false,
+                frameType == 5,
+                realDataLength);
+        RESFlvData resFlvData = new RESFlvData();
+        resFlvData.droppable = true;
+        resFlvData.byteBuffer = finalBuff;
+        resFlvData.size = finalBuff.length;
+        resFlvData.dts = (int) tms;
+        resFlvData.flvTagType = RESFlvData.FLV_RTMP_PACKET_TYPE_VIDEO;
+        resFlvData.videoFrameType = frameType;
+        mDataCollecter.collect(resFlvData, RESRtmpSender.FROM_VIDEO);
     }
 
 }

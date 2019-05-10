@@ -48,7 +48,7 @@ import static android.os.Build.VERSION_CODES.N;
  */
 class MicRecorder implements Encoder {
     private static final String TAG = "MicRecorder";
-    private static final boolean VERBOSE = false;
+    private static final boolean VERBOSE = true;
 
     private final AudioEncoder mEncoder;
     private final HandlerThread mRecordThread;

@@ -19,7 +19,7 @@ public class AudioSenderThread extends Thread {
     private MediaCodec dstAudioEncoder;
     private RESFlvDataCollecter dataCollecter;
 
-    AudioSenderThread(String name, MediaCodec encoder, RESFlvDataCollecter flvDataCollecter) {
+    public AudioSenderThread(String name, MediaCodec encoder, RESFlvDataCollecter flvDataCollecter) {
         super(name);
         eInfo = new MediaCodec.BufferInfo();
         startTime = 0;
@@ -29,7 +29,7 @@ public class AudioSenderThread extends Thread {
 
     private boolean shouldQuit = false;
 
-    void quit() {
+    public void quit() {
         shouldQuit = true;
         this.interrupt();
     }
@@ -38,6 +38,7 @@ public class AudioSenderThread extends Thread {
     public void run() {
         while (!shouldQuit) {
             int eobIndex = dstAudioEncoder.dequeueOutputBuffer(eInfo, WAIT_TIME);
+            LogTools.d("AudioSenderThread eobIndex-->"+eobIndex);
             switch (eobIndex) {
                 case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
                     LogTools.d("AudioSenderThread,MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED");
