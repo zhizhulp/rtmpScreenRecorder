@@ -24,7 +24,10 @@
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait">
-
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
         <activity
             android:name=".SoftStreamingActivity"
@@ -35,10 +38,7 @@
             android:hardwareAccelerated="true"
             android:theme="@style/StreamingTheme" />
         <activity android:name="net.yrom.screenrecorder.RecMainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+
         </activity>
     </application>
 

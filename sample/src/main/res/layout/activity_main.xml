@@ -11,6 +11,7 @@
         android:gravity="center"
         android:orientation="vertical">
         <EditText
+            android:text="rtmp://192.168.1.194:1935/hls/stream"
             android:id="@+id/et_url"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
